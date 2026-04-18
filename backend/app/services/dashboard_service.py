@@ -1,51 +1,41 @@
-import os
 import json
 from typing import Dict, List
 from app.core.redis import redis_client
 
-CHECKPOINT_DIR = "checkpoints"
-
-
 async def get_round_history(model_id: str, version: str) -> List[Dict]:
+    """
+    Fetches the full training history for a model version from Redis.
+    This is much faster than scanning the checkpoints directory.
+    """
     history = []
-
-    if not os.path.exists(CHECKPOINT_DIR):
+    round_meta_key = f"fl:{model_id}:{version}:round_history"
+    
+    # Get all entries from the Redis list
+    history_raw = await redis_client.lrange(round_meta_key, 0, -1)
+    
+    if not history_raw:
         return history
 
-    for filename in os.listdir(CHECKPOINT_DIR):
-
-        # Only read JSON files
-        if not filename.endswith(".json"):
-            continue
-
-        # Match model + version
-        print(f"This is model id and version :{model_id}, {version}")
-        if not filename.startswith(f"{model_id}_{version}_"):
-            continue
-
-        path = os.path.join(CHECKPOINT_DIR, filename)
-
+    for item in history_raw:
         try:
-            with open(path, "r") as f:
-                data = json.load(f)
-                print(f"data is {data}")
-                history.append({
-                    "round": data.get("round"),
-                    "accuracy": data.get("accuracy", 0.0)
-                })
-
+            data = json.loads(item)
+            history.append({
+                "round": data.get("round"),
+                "accuracy": data.get("accuracy", 0.0)
+            })
         except Exception:
-            # Skip corrupted/malformed files
             continue
 
-    # Sort by round number
+    # Sort by round number to ensure the graph draws correctly
     history.sort(key=lambda x: x["round"] if x["round"] is not None else -1)
-
     return history
 
 
 async def get_clients(model_id: str, version: str) -> List[Dict]:
-
+    """
+    Fetches the contribution history of every client for this model.
+    """
+    # Pattern to find all client history keys for this specific model/version
     pattern = f"fl:{model_id}:{version}:client:*:history"
     keys = await redis_client.keys(pattern)
 
@@ -53,10 +43,12 @@ async def get_clients(model_id: str, version: str) -> List[Dict]:
 
     for key in keys:
         try:
-            # Extract client_id
+            # Extract client_id from key: fl:model:version:client:ID:history
             parts = key.split(":")
+            if len(parts) < 5:
+                continue
             client_id = parts[4]
-            print(f"This is client id: {client_id}")
+
             history_raw = await redis_client.lrange(key, 0, -1)
             history = [json.loads(h) for h in history_raw]
 
@@ -64,14 +56,16 @@ async def get_clients(model_id: str, version: str) -> List[Dict]:
                 "clientId": client_id,
                 "history": history
             })
-
         except Exception:
             continue
 
     return clients
 
-async def get_dashboard_data(model_id: str, version: str):
 
+async def get_dashboard_data(model_id: str, version: str) -> Dict:
+    """
+    Aggregates history and client data for the React Dashboard.
+    """
     round_history = await get_round_history(model_id, version)
     clients = await get_clients(model_id, version)
 

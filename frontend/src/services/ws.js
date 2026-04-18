@@ -1,29 +1,28 @@
-export function createWebSocket(onMessage) {
+// src/services/ws.js
+export const createWebSocket = (onMessage) => {
   const socket = new WebSocket("ws://localhost:8000/ws");
-
-  socket.onopen = () => {
-    console.log("WebSocket connected");
-  };
 
   socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    console.log(data)
+    console.log("🔥 CORE SOCKET RECEIVED:", data); // Check if this shows up!
     onMessage(data);
   };
-  
+
   socket.onerror = (error) => {
-    console.log("Websocket error", error)
-  }
+    console.error("❌ SOCKET ERROR:", error);
+  };
 
   socket.onclose = () => {
-    console.log("WebSocket disconnected");
+    console.warn("🔌 SOCKET CLOSED");
   };
 
   return socket;
-}
+};
 
-export function sendMessage(socket, message) {
+export const sendMessage = (socket, message) => {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(message));
+  } else {
+    console.error("🚫 CANNOT SEND: Socket is not open");
   }
-}
+};
