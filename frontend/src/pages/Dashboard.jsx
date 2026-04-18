@@ -82,7 +82,7 @@ export default function Dashboard() {
             </div>
             <div>
               <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">
-                Nexus <span className="text-indigo-500 text-2xl not-italic">Core</span>
+                Federated Learning <span className="text-indigo-500 text-2xl not-italic">Core</span>
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-ping"></span>
